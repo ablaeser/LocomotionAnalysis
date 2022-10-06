@@ -37,13 +37,17 @@ for runs = 1:numel(loco)
         loco(runs).state = hmmviterbi( imquantize(loco(runs).speed, emitRange)', transEst, emitEst )';
         %loco(r).stateDown = hmmviterbi(imquantize( loco(r).speedDown , emitRange)', transEst, emitEst )'; 
     elseif strcmpi(modelVar, 'velocity')
-        loco(runs).state = hmmviterbi( imquantize(loco(runs).Vfilt, emitRange)', transEst, emitEst )';
-        %loco(r).stateDown = hmmviterbi( imquantize(loco(r).Vdown , emitRange)', transEst, emitEst )'; 
-    end
-    Nplane = round(15.49/expt.scanRate);
-    scanStates = reshape(loco(runs).state(1:expt.Nscan(runs)*Nplane), Nplane, [])';  % 1:expt.Nscan(r)*expt.Nplane  1:floor(length(loco(runs).state)/expt.Nplane)
-    % imshow( scanStates', [] )
-    loco(runs).stateDown = mode(scanStates,2); % max( scanStates, [], 2); % down sample for volume scan using modal or maximal state within the scan
+        try
+            loco(runs).state = hmmviterbi( imquantize(loco(runs).Vfilt, emitRange)', transEst, emitEst )';
+            Nplane = round(15.49/expt.scanRate);
+            scanStates = reshape(loco(runs).state(1:expt.Nscan(runs)*Nplane), Nplane, [])';  % 1:expt.Nscan(r)*expt.Nplane  1:floor(length(loco(runs).state)/expt.Nplane)
+            % imshow( scanStates', [] )
+            loco(runs).stateDown = mode(scanStates,2); % max( scanStates, [], 2); % down sample for volume scan using modal or maximal state within the scan
+        catch
+            fprintf('Failed to calculated loco(%i).state, calculating stateDown instead', runs)
+            loco(runs).stateDown = hmmviterbi( imquantize(loco(runs).Vdown , emitRange)', transEst, emitEst )';
+        end
+    end   
     loco(runs).stateBinary = false( size(loco(runs).stateDown, 1), Nstate );
     for n = 1:Nstate,  loco(runs).stateBinary(:,n) = loco(runs).stateDown == n;  end      
 end

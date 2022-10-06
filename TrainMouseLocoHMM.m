@@ -1,6 +1,6 @@
 %% Train mouse-specific models
 mainDir = 'D:\2photon\';
-mouse = {'CGRPAi6-1'}; % {'DL102','DL89','DL115','DL118','DL68','DL75','DL112','DL117','DL72','DL67','DL122'}; % 
+mouse = {'DL112'}; % {'DL102','DL89','DL115','DL118','DL68','DL75','DL112','DL117','DL72','DL67','DL122'}; %  D:\2photon\DL102
 Nmouse = numel(mouse);
 mouseLoco = cell(1,Nmouse);
 tic;
@@ -34,7 +34,7 @@ for m = 1:Nmouse
             fprintf('\nf = %i: %s has no runs', f, mouseExptDir{f});
         end
     end
-    TrainLocoHMM(mouseLoco(m), 'Nstate',2, 'var','velocity', 'dir',mouseDir, 'name',mouse{m}, 'show',true, 'overwrite',true); 
+    TrainLocoHMM(mouseLoco(m), 'Nstate',2, 'int',1, 'var','velocity', 'dir',mouseDir, 'name',mouse{m}, 'show',true, 'overwrite',true);  %  'speed'
     toc
 end
 
