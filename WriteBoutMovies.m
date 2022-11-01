@@ -46,9 +46,14 @@ NsetRun = numel(setRun);
 tempFrameFile = strcat(movParam.dir, 'tempFrame.jpg'); %  tif
 boutStack = cell(1,NsetRun); Tbout = cell(1,NsetRun); boutSpeed = cell(1,NsetRun); storeFrames = [];
 for run = setRun %runs
-    boutStack{run} = cell(1,periBout(run).Nbout); %tifPath = cell(1,periBout(run).Nbout);
-    setRunBouts = intersect( setBout, 1:periBout(run).Nbout );
-    for b = setRunBouts  %setBout % 1:periBout(run).Nbout
+    if isfield(periBout, 'Nbout')
+        Nbout = periBout(run).Nbout;
+    else
+        Nbout = numel(periBout(run));
+    end
+    boutStack{run} = cell(1,Nbout); %tifPath = cell(1,Nbout);
+    setRunBouts = intersect( setBout, 1:Nbout );
+    for b = setRunBouts  %setBout % 1:Nbout
         fprintf('\n[run, bout] = [%i,  %i]', run, b);
         boutFileName = sprintf('%s%s_run%i_%s_%s%03d', movParam.dir, expt.name, run, movParam.regType, movParam.boutType, b);
         stackPath = strcat(boutFileName,'_stack.tif');
@@ -57,7 +62,7 @@ for run = setRun %runs
         [~,lastScan] = min( abs(Tcat - (periBout(run).Tstop(b) + movParam.Tperi(2)) ) ); %Tcat(lastScan)
         NscanBout = lastScan-firstScan+1;
         if expt.Nplane == 1
-            boutStack{run}{b} = WriteSbxPlaneTif(sourceSbxPath, sbxInfo, movParam.zProj, 'firstScan',firstScan, 'Nscan',NscanBout, 'binT',movParam.binT, 'verbose',true);     
+            boutStack{run}{b} = WriteSbxPlaneTif(sourceSbxPath, sbxInfo, movParam.zProj, 'firstScan',firstScan, 'Nscan',NscanBout, 'binT',movParam.binT, 'verbose',true, 'overwrite',true, 'dir',movParam.dir);     
         else
             tempStack = zeros(expt.Nrow, expt.Ncol, NscanBout, expt.Nplane);
             for z = flip(movParam.zProj)
@@ -68,7 +73,7 @@ for run = setRun %runs
         end
         % Determine the speed and relative timing of each (possibly binned) frame/scan
         if movParam.binT > 1
-            [catChunkLims, Nchunk] = MakeChunkLims(firstScan, lastScan, sbxInfo.totScan, 'size',movParam.binT );
+            [catChunkLims, Nchunk] = MakeChunkLims(firstScan, lastScan, sbxInfo.totScan, 'size',movParam.binT ); % , chunkLength
             boutChunkLims = MakeChunkLims(1, NscanBout, NscanBout, 'size',movParam.binT ); %size(boutProjStack,3)
             for c = 1:Nchunk
                 Tbout{run}{b}(c) = mean( Tcat(catChunkLims(c,1):catChunkLims(c,2)) - periBout(run).Tstart(b) );

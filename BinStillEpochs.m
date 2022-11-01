@@ -11,7 +11,7 @@ addRequired( IP, 'csdBout', checkData )
 addParameter( IP, 'criterion', 'bout', @ischar )
 addParameter( IP, 'minStillDur', 90, @isnumeric ) % initial epochs must be at least this long
 addParameter( IP, 'trim', 15, @isnumeric ) % trim the first/last seconds of each initial epoch
-addParameter( IP, 'chunk', 60, @isnumeric ) % divide each epoch into chunk seconds intervals
+addParameter( IP, 'bin', 60, @isnumeric ) % divide each epoch into bin seconds intervals
 addParameter( IP, 'maxMissing', 0.1, @isnumeric ) % exclude epochs where the median ROI is missing at least this fraction of data
 addParameter( IP, 'acute', 15, @isnumeric ) % define acute phase as first minutes after beginning of CSD run
 addParameter( IP, 'post', 60, @isnumeric ) % post-CSD phase ends post minutes after beginning of CSD run
@@ -20,12 +20,12 @@ parse( IP, expt, T, loco, fluor, deform, csdBout, varargin{:} );
 criterion = IP.Results.criterion;
 minStillDur = IP.Results.minStillDur;
 trim = IP.Results.trim;
-stillChunkDur = IP.Results.chunk;
+stillChunkDur = IP.Results.bin;
 if stillChunkDur > minStillDur
     warning('Chunk size > min still dur')
     stillChunkDur = minStillDur - 2*trim; 
 end
-if stillChunkDur <= 0, error('Trim size not compatible with chunk size'); end
+if stillChunkDur <= 0, error('Trim size not compatible with bin size'); end
 maxMissingFrac = IP.Results.maxMissing; %0.1;
 acuteLimit = IP.Results.acute;
 postLimit = IP.Results.post;
@@ -34,7 +34,7 @@ trimScan = round(trim*expt.scanRate);
 stillChunkNscan = round(stillChunkDur*expt.scanRate);
 stillEpoch = repmat(struct('scan_full',[], 'Nscan_full',NaN, 'T_full',[], 'Tstart_full',NaN, 'Tmid_full',NaN, 'Tstop_full',NaN, 'dur_full',[], 'dur_trim',[], 'raster_full',[], 'Froi',[], 'Fnp',[], 'Fo',[], 'dFF',[], 'scale',[],...
     'Nmissing',[], 'missingFrac',[], 'missingFracMed',[], 'roiDur',[], 'roiDurMed',[] ), 1, expt.Nruns); % 'run',NaN, 
-stillBin = repmat(struct('run',NaN, 'scan',[], 'Nscan',NaN, 'T',[], 'Tstart',NaN, 'Tmid',NaN, 'Tstop',NaN, 'dur',NaN, 'raster',[], 'Froi',[], 'Fnp',[], 'Fo',[], 'dFF',[], 'scale',[],...
+stillBin = repmat(struct('run',NaN, 'epoch',NaN, 'scan',[], 'Nscan',NaN, 'T',[], 'Tstart',NaN, 'Tmid',NaN, 'Tstop',NaN, 'dur',NaN, 'raster',[], 'Froi',[], 'Fnp',[], 'Fo',[], 'dFF',[], 'scale',[],...
     'Nmissing',[], 'missingFrac',[], 'missingFracMed',[], 'roiDur',[], 'roiDurMed',[] ), 0, 1);
 stillSumm = struct('Nepoch',NaN, 'epoch_run',[], 'dur_full',[], 'dur_full_tot',[], 'dur_trim',[], 'dur_trim_tot',[]);
 S = 0; E = 0;
@@ -84,7 +84,7 @@ for runs = 1:expt.Nruns
         stillEpoch(runs).dur_trim(ep) = stillEpoch(runs).Tstop_trim(ep) - stillEpoch(runs).Tstart_trim(ep);
         % Break each (trimmed) epoch of stillness into bins of predetermined size
         [tempChunkLims, ~, tempChunkSize] = MakeChunkLims( stillEpoch(runs).scan_trim{ep}(1), stillEpoch(runs).scan_trim{ep}(end), stillEpoch(runs).scan_trim{ep}(end), 'size',stillChunkNscan);
-        if tempChunkSize(end) < stillChunkNscan  % Absorb remainder into last chunk
+        if tempChunkSize(end) < stillChunkNscan  % Absorb remainder into last bin
             tempChunkLims(end-1,2) = tempChunkLims(end,2);
             tempChunkLims(end,:) = [];
             tempChunkSize = diff(tempChunkLims,1,2)+1;
@@ -144,7 +144,7 @@ for runs = 1:expt.Nruns
                 %plot(-2*vertcat(loco(runs).bout), 'color',[0.6,0.6,0.6], 'LineWidth',2 ); % T{runs}/60,
             end
         end
-        stillEpoch(runs).Nbin(ep) = bin;
+        stillEpoch(runs).Nchunk(ep) = chunk;
     end
 end
 if ~isempty(stillBin)
@@ -240,7 +240,7 @@ end
 
         %{
     for s = find(tempStillDur >= minStillDur)
-        % Break each epoch of stillness into bins of predetermined size
+        % Break each epoch of stillness into chunks of predetermined size
         tempStillScanRange = tempStillCC.PixelIdxList{s}([trimScan,end-trimScan]);
         [tempChunkLims, ~, tempChunkSize] = MakeChunkLims( tempStillScanRange(1), tempStillScanRange(end), tempStillScanRange(end), 'size',stillChunkNscan);
         % Absorb remainder into last chunk
@@ -253,7 +253,7 @@ end
             S = S+1;
             stillBin(S).run = runs;
             stillBin(S).epoch = s;
-            stillBin(S).scan = tempChunkLims(chunk,1):tempChunkLims(chunk,2);
+            stillBin(S).scan = tempChunkLims(chunk,1):tempChunkLims(bin,2);
             stillBin(S).Nscan = numel(stillBin(S).scan);
             stillBin(S).T = T{runs}(stillBin(S).scan); % -Tscan{run}(stillBin(S).scan(1))
             stillBin(S).Tstart = stillBin(S).T(1);

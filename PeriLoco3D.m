@@ -11,6 +11,7 @@ addParameter( IP, 'iso', [], @isnumeric ) % bout must be separated by at least t
 addParameter( IP, 'base', 15, @isnumeric )
 addParameter( IP, 'run', 5, @isnumeric ) % bout must last at least this long
 addParameter( IP, 'on', 5, @isnumeric )
+addParameter( IP, 'min_vel_on', 0, @isnumeric)
 addParameter( IP, 'Nshuff', 0, @isnumeric )
 addParameter( IP, 'sig', 0.05, @isnumeric )
 parse( IP, expt, T, loco, deform, fluor, defVars, varargin{:} ); 
@@ -18,6 +19,7 @@ periParam.base = IP.Results.base;
 periParam.run = IP.Results.run;
 periParam.on = IP.Results.on;
 periParam.iso = IP.Results.iso;
+periParam.min_vel_on = IP.Results.min_vel_on;
 if isempty(periParam.iso), periParam.iso = periParam.base*[1,0]; end
 if numel(periParam.iso) == 1, periParam.iso = periParam.iso*[1,1]; end
 periParam.Nshuff = IP.Results.Nshuff;
@@ -30,12 +32,12 @@ end
 [Nscan, Nstate] = size( loco.stateBinary );
 NdefVars = numel(defVars);
 periParam.dT = 1/expt.scanRate;
-periParam.NbaseScan = ceil(expt.scanRate*periParam.base);
-periParam.NrunScan = ceil(expt.scanRate*periParam.run);
+periParam.NbaseScan = round(expt.scanRate*periParam.base); % ceil
+periParam.NrunScan = round(expt.scanRate*periParam.run); % 
 periParam.T = periParam.dT*(-periParam.NbaseScan:periParam.NrunScan); %linspace( -periParam.base, periParam.run, NsubScan); 
 %Tfull = periParam.dT*(0:NmergedScan-1)';
 %plot( T, loco.state ); box off; ylim([-0.01, 1.01]); xlim([0,Inf]);
-runState = loco.stateBinary(:,Nstate); %logical(loco.locoState(:,Nstate))'; % plot( runState )
+runState = loco.stateBinary(:,Nstate); %logical(loco.locoState(:,Nstate))'; % plot( runState ); ylim([0,1.3]);
 runBout = regionprops( runState, 'Area', 'PixelIdxList' );
 Nputative = numel(runBout);
 putativeBout = repmat( struct('dur',NaN, 'iso',nan(1,2), 'scan',[], 'Nscan',NaN), 1, Nputative );
@@ -61,7 +63,7 @@ end
 %{
 figure('Units','normalized','OuterPosition',[0.16,0.13,0.7,0.8], 'Color','w');
 subplot(1,2,1); ecdf( [putativeBout.dur] ); hold on; line(periParam.run*[1,1],[0,1],'color','r','lineStyle','--'); xlabel('Putative Duration (s)'); ylabel('CDF'); axis square;
-subplot(1,2,2); ecdf( [putativeBout.iso] ); hold on; line(periParam.iso*[1,1],[0,1],'color','r','lineStyle','--'); xlabel('Isolation (s)'); set(gca,'Xscale','log'); axis square; % ylabel('CDF'); 
+subplot(1,2,2); ecdf( [putativeBout.iso] ); hold on; line(periParam.iso,[0,1],'color','r','lineStyle','--'); xlabel('Isolation (s)'); set(gca,'Xscale','log'); axis square; % ylabel('CDF'); 
 %}
 putIso = reshape( [putativeBout.iso], 2, Nputative )';
 pGood = find( [putativeBout.dur]' >= periParam.run & all([putIso(:,1) > periParam.iso(1),putIso(:,2) > periParam.iso(2)],2) )';  % enforce minimum bout duration, isolation

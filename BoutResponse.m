@@ -2,39 +2,44 @@ respStruct = struct('Nbout',[], 'meanEffect',[], 'exc',[], 'Nexc',NaN, 'excFrac'
 boutRespStruct = struct('pre',respStruct, 'post',respStruct, 'change',struct('e2e',[], 'Ne2e',NaN, 'e2n',[], 'Ne2n',NaN, 'e2i',[], 'Ne2i',NaN, ...
     'n2e',[], 'Nn2e',NaN, 'n2n',[], 'Nn2n',NaN, 'n2i',[], 'Nn2i',NaN, 'i2e',[], 'Ni2e',NaN, 'i2n',[], 'Ni2n',NaN, 'i2i',[], 'Ni2i',NaN));
 boutResponse = repmat(boutRespStruct, 1, Nexpt);  periBout = cell(1,Nexpt); periParam = cell(1,Nexpt); periStat = cell(1,Nexpt);
-minBoutDur = 2;
-baseDur = 10;
-initIso = [0,0];
-minIso = 10;
-minMeanEffect = 0.05; % 0.05;
-pMax = 0.05;
 plotYlim = [-0.3,0.5]; TL = 0.001;
 %BoutResponse_Classification = figure('WindowState','maximized', 'Color','w');   % 'Units','inches', 'Position',[6, 5, 2.1, 1.1] , 'Color','w'
-for x = find(~cellfun(@isempty, Tscan)) %xPresent %x3Dcsd %
+for x = find(~cellfun(@isempty, Tscan)) %xPresxent %x3Dcsd %
     savePath = sprintf('%s%s_bouts.mat', expt{x}.dir, expt{x}.name);
     if exist(savePath,'file')
         fprintf('\nLoading %s', savePath)
         load(savePath, 'periData','boutResp'); % ,'minIso','minMeanEffect','pMax','minBoutDur','baseDur','initIso',
         boutResponse(x) = boutResp;  periBout{x} = periData.bout;  periStat{x} = periData.stat;  periParam{x} = periData.param;
     else
+        % Set parameters
+        minBoutDur = 2;
+        baseDur = 10;
+        initIso = [0,0];
+        minIso = 10;
+        minVelOn = 4;
+        minMeanEffect = 0.05; % 0.05;
+        pMax = 0.05;
         % Get peri-locomotion, stillness, and peri-CSD bout data
         for runs = flip(1:expt{x}.Nruns)
             [periBout{x}(runs), periParam{x}(runs), loco{x}(runs)] = PeriLoco3D(expt{x}, Tscan{x}{runs}, loco{x}(runs), deform{x}(runs), fluor{x}(runs).F.ROI, defVars, 'base',baseDur, 'run',minBoutDur, 'iso',initIso); %periParam(x)
             %InspectPeriDeform3D( expt{x}, periBout{x}(run), {'fluor','scaleMag'} ); %defVars
         end
         % Determine effect of loco bouts pre-CSD
+        preEffect_speed = []; 
         preEffect_fluor_onset = []; preEffect_fluor_offset = [];  preEffect_trans = []; preEffect_scale = []; preEffect_shear = []; preEffect_shift = [];
         for runs = expt{x}.preRuns %1:2
             if periBout{x}(runs).Nbout > 0
                 % get effect sizes
+                tempEffect_speed = periBout{x}(runs).stat.speed.run;
                 tempEffect_fluor_onset = periBout{x}(runs).stat.fluor.effect(:,:,1); % effect of bout on fluor, relative to pre-running period
                 tempEffect_fluor_offset = periBout{x}(runs).stat.fluor.effect(:,:,2); % effect of bout offset on fluor, relative to pre-running period
                 tempEffect_trans = periBout{x}(runs).stat.transMag.effect(:,:,1); % effect of bout on scaling, relative to pre-running period
                 tempEffect_scale = periBout{x}(runs).stat.scaleMag.effect(:,:,1); % effect of bout on scaling, relative to pre-running period
                 tempEffect_shear = periBout{x}(runs).stat.shearMag.effect(:,:,1); % effect of bout on shearing, relative to pre-running period
-                tempEffect_shift = periBout{x}(runs).stat.shiftZ.effect(:,:,1); % effect of bout on scaling, relative to pre-running period
+                tempEffect_shift = periBout{x}(runs).stat.shiftZ.effect(:,:,1); % % effect of bout on scaling, relative to pre-running period
                 % suppress poorly isolated bouts
                 bBad = periBout{x}(runs).iso(:,1) < minIso; % any(periBout{x}(run).iso < minIso, 2);  % find poorly isolated bouts
+                tempEffect_speed(bBad) = NaN;
                 tempEffect_fluor_onset(bBad,:) = NaN; % suppress poorly isolated bouts
                 tempEffect_fluor_offset(bBad,:) = NaN;
                 tempEffect_trans(bBad,:) = NaN;
@@ -42,6 +47,7 @@ for x = find(~cellfun(@isempty, Tscan)) %xPresent %x3Dcsd %
                 tempEffect_shear(bBad,:) = NaN; % suppress poorly isolated bouts
                 tempEffect_shift(bBad,:) = NaN; % suppress poorly isolated bouts
                 % join effects across runs
+                preEffect_speed = vertcat(preEffect_speed, tempEffect_speed);
                 preEffect_fluor_onset = vertcat(preEffect_fluor_onset, tempEffect_fluor_onset);
                 preEffect_fluor_offset = vertcat(preEffect_fluor_offset, tempEffect_fluor_offset);
                 preEffect_trans = vertcat(preEffect_trans, tempEffect_trans);
@@ -58,6 +64,7 @@ for x = find(~cellfun(@isempty, Tscan)) %xPresent %x3Dcsd %
 
         % Save the results to boutRespStruct
         boutResponse(x).pre.Nbout = mode(sum(~isnan(preEffect_fluor_onset),1));
+        boutResponse(x).pre.speedEffect = preEffect_speed;
         % fluor
         boutResponse(x).pre.boutEffect = cat(3, preEffect_fluor_onset, preEffect_fluor_offset); %preEffect_fluor_onset; %
         boutResponse(x).pre.meanEffect = cat(1, meanPreEffect_onset, meanPreEffect_offset);
@@ -90,23 +97,56 @@ for x = find(~cellfun(@isempty, Tscan)) %xPresent %x3Dcsd %
 
         boutResponse(x).pre.offset = find( pEffect_pre_offset < pMax & meanPreEffect_offset > minMeanEffect ); % which units are activated on offset?
         boutResponse(x).pre.Noffset = numel(boutResponse(x).pre.offset);
+
+        % 
+
+
+
         % Determine effect of loco bouts post-CSD
         % {
         if ~isnan(expt{x}.csd) && sum([periBout{x}(expt{x}.csd:end).Nbout]) > 0
-            postEffect = [];
+            postEffect_speed = []; 
+            postEffect_fluor_onset = []; postEffect_fluor_offset = []; postEffect_trans = []; postEffect_scale = []; postEffect_shear = []; postEffect_shift = [];
             for runs = expt{x}.csd+1:expt{x}.Nruns %3:4
                 if periBout{x}(runs).Nbout > 0
                     bBad = periBout{x}(runs).iso(:,1) < minIso; % find poorly isolated bouts
+                    tempEffect_speed = periBout{x}(runs).stat.speed.run;
                     tempEffect_fluor_onset = periBout{x}(runs).stat.fluor.effect(:,:,1); % effect of bout on fluor, relative to pre-running period
-                    tempEffect_fluor_onset(bBad,:) = NaN;% suppress poorly isolated bouts
-                    postEffect = vertcat(postEffect, tempEffect_fluor_onset);
+                    tempEffect_trans = periBout{x}(runs).stat.transMag.effect(:,:,1); % effect of bout on scaling, relative to pre-running period
+                    tempEffect_scale = periBout{x}(runs).stat.scaleMag.effect(:,:,1); % effect of bout on scaling, relative to pre-running period
+                    tempEffect_shear = periBout{x}(runs).stat.shearMag.effect(:,:,1); % effect of bout on shearing, relative to pre-running period
+                    tempEffect_shift = periBout{x}(runs).stat.shiftZ.effect(:,:,1); % effect of bout on scaling, relative to pre-running period
+                    % suppress poorly isolated bouts
+                    tempEffect_speed(bBad) = NaN;
+                    tempEffect_fluor_onset(bBad,:) = NaN; % suppress poorly isolated bouts
+                    tempEffect_fluor_offset(bBad,:) = NaN;
+                    tempEffect_trans(bBad,:) = NaN;
+                    tempEffect_scale(bBad,:) = NaN; % suppress poorly isolated bouts
+                    tempEffect_shear(bBad,:) = NaN; % suppress poorly isolated bouts
+                    tempEffect_shift(bBad,:) = NaN; % suppress poorly isolated bouts
+                    % join effects across runs
+                    postEffect_speed = vertcat(postEffect_speed, tempEffect_speed);
+                    postEffect_fluor_onset = vertcat(postEffect_fluor_onset, tempEffect_fluor_onset);
+                    postEffect_fluor_offset = vertcat(postEffect_fluor_offset, tempEffect_fluor_offset);
+                    postEffect_trans = vertcat(postEffect_trans, tempEffect_trans);
+                    postEffect_scale = vertcat(postEffect_scale, tempEffect_scale);
+                    postEffect_shear = vertcat(postEffect_shear, tempEffect_shear);
+                    postEffect_shift = vertcat(postEffect_shift, tempEffect_shift);
+
                 end
             end
-            [~, pEffect_post] = ttest(postEffect);
-            meanPostEffect = mean(postEffect, 1, 'omitnan');
-            boutResponse(x).post.Nbout = mode(sum(~isnan(postEffect),1));
-            boutResponse(x).post.boutEffect = postEffect;
+            [~, pEffect_post] = ttest(postEffect_fluor_onset);
+            meanPostEffect = mean(postEffect_fluor_onset, 1, 'omitnan');
+            boutResponse(x).post.Nbout = mode(sum(~isnan(postEffect_fluor_onset),1));
+            boutResponse(x).post.speedEffect = postEffect_speed;
+            boutResponse(x).post.boutEffect = postEffect_fluor_onset;
             boutResponse(x).post.meanEffect = meanPostEffect;
+
+            % deformation
+            boutResponse(x).post.transEffect = postEffect_trans;
+            boutResponse(x).post.scaleEffect = postEffect_scale;
+            boutResponse(x).post.shearEffect = postEffect_shear;
+            boutResponse(x).post.shiftEffect = postEffect_shift;
 
             boutResponse(x).post.exc = find( pEffect_post < pMax & meanPostEffect > minMeanEffect );
             [~, tempSortInd] = sort( meanPostEffect(boutResponse(x).post.exc), 'descend' ); % sort from most positive to most negative

@@ -109,16 +109,3 @@ if show
     linkaxes(sp,'xy');
 end
 end
-
-%{
-close all; clearvars sp;
-figure('WindowState','maximized');
-for r = 1 % find(~cellfun(@isempty, {loco.quad}))
-    sp(1) = subplot(4,1,1); plot( loco(r).speedDown ); ylabel('Downsampled Speed'); ylim([0,30]); box off;
-    sp(2) = subplot(4,1,2); plot( loco(r).speedDiscrete ); ylabel('Discretized Speed'); ylim([0,30]); box off;
-    sp(3) = subplot(4,1,3); plot( loco(r).state ); ylabel('Locomotive State'); ylim([1,Nstate]); box off;
-    sp(4) = subplot(4,1,4); plot( loco(r).stateBinary(:,2) ); ylabel('Run State'); ylim([0,1]); box off;
-    linkaxes(sp,'x');
-    %pause; cla;
-end
-%}
