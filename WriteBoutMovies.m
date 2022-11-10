@@ -16,7 +16,11 @@ addParameter( IP, 'Toffset', 0, @isnumeric )
 parse( IP, expt, sbxInfo, Tscan, loco, periBout, movParam, varargin{:} );  % , ROI 
 ROI = IP.Results.ROI; Nroi = numel(ROI);
 axon = IP.Results.axon;  Naxon = numel(axon);
-
+if Naxon > 1
+    axonColor = distinguishable_colors(Naxon);
+else
+    axonColor = [1,1,1]; % 0.5*
+end
 setRun = IP.Results.run;
 setBout = IP.Results.bout;
 %overwrite = IP.Results.overwrite;
@@ -42,6 +46,8 @@ if isempty(setRun)
         setRun = 1:expt.Nruns;
     end
 end
+if ~isfield(movParam, 'FontSize') || isempty(movParam.FontSize), movParam.FontSize = 14; end
+if ~isfield(movParam, 'tif') || isempty(movParam.tif), movParam.tif = false; end
 NsetRun = numel(setRun);
 tempFrameFile = strcat(movParam.dir, 'tempFrame.jpg'); %  tif
 boutStack = cell(1,NsetRun); Tbout = cell(1,NsetRun); boutSpeed = cell(1,NsetRun); storeFrames = [];
@@ -91,9 +97,10 @@ for run = setRun %runs
         % figure; plot(Tbout{run}{b}, boutSpeed{run}{b} )
         
         % Write the movie to tiff
-        fprintf('\nWriting %s...  ', stackPath); tic;
-        saveastiff(boutStack{run}{b}, stackPath, GrayOpt); toc
-        
+        if movParam.tif
+            fprintf('\nWriting %s...  ', stackPath); tic;
+            saveastiff(boutStack{run}{b}, stackPath, GrayOpt); toc
+        end
         % Compress the data to 8 bit
         displayLims = prctile(boutStack{run}{b}(:), movParam.displayPct);
         boutStack{run}{b} = uint8( rescale(boutStack{run}{b}, 0, 255, 'InputMin',displayLims(1), 'InputMax',displayLims(2)) );
@@ -104,36 +111,31 @@ for run = setRun %runs
             %displayLims = [prctile(boutStack{run}{b}(:),movParam.displayPct(1)), prctile(boutStack{run}{b}(:),movParam.displayPct(2))]; %[min(boutStack{run}{b}(:)), max(boutStack{run}{b}(:))];
             close all; clearvars storeFrames
             NperiScan = size(boutStack{run}{b},3);
-            aviFig = figure('color','k','Units', 'normalized', 'Position', [0 0 1 1]); % 'WindowState','maximized',
+            movFig = figure('color','k','Units', 'normalized', 'Position', [0 0 1 1]); % 'WindowState','maximized',
             for z = flip(1:NperiScan)
                 imshow(boutStack{run}{b}(:,:,z), [0,255], 'border','tight'); hold on; % displayLims
                 %MakeScaleBar( round(expt(X).umPerPixel*[50,50]), {get(gca,'Xlim'), get(gca,'Ylim')}, [0.1,0.95], [0,0], 'label',false, 'color','w' );
                 if ~isempty(movParam.scalebar),  DrawScaleBar( movParam.scalebar );  end
                 if ~isempty(ROI)
                     if ~isempty(axon)
-                        if Naxon > 1
-                            axonColor = distinguishable_colors(Naxon);
-                        else
-                            axonColor = [1,1,1]; % 0.5*
-                        end
                         for a = 1:Naxon
-                            for i = axon(a).ROI
-                                plot( ROI(i).footprintEdge(:,2)-movParam.edges(1)+1, ROI(i).footprintEdge(:,1)-movParam.edges(3)+1, '.', 'color',axonColor(a,:), 'MarkerSize',1 );
+                            for roi = axon(a).ROI
+                                plot( ROI(roi).footprintEdge(:,2)-movParam.edges(1)+1, ROI(roi).footprintEdge(:,1)-movParam.edges(3)+1, '.', 'color',axonColor(a,:), 'MarkerSize',1 );
                                 %text(ROI(i).cent(1)-movParam.edges(1)+1, ROI(i).cent(2)-movParam.edges(3)+1, sprintf('%i-%i',i,a), 'HorizontalAlignment','center', 'color',axonColor(a,:), 'FontSize',10  ) 
                             end
                         end
                     else
                         roiColor = distinguishable_colors(Nroi);
-                        for i = 1:Nroi
-                            plot( ROI(i).footprintEdge(:,2)-movParam.edges(1)+1, ROI(i).footprintEdge(:,1)-movParam.edges(3)+1, '.', 'color',roiColor(i,:), 'MarkerSize',1 );
+                        for roi = 1:Nroi
+                            plot( ROI(roi).footprintEdge(:,2)-movParam.edges(1)+1, ROI(roi).footprintEdge(:,1)-movParam.edges(3)+1, '.', 'color',roiColor(roi,:), 'MarkerSize',1 );
                             %text(ROI(i).cent(1)-movParam.edges(1)+1, ROI(i).cent(2)-movParam.edges(3)+1, sprintf('%i',i), 'HorizontalAlignment','center', 'color',roiColor(i,:), 'FontSize',10  ) 
                         end
                         
                     end
                 end
-                text( 0.9, 0.9, strcat(num2str(Tbout{run}{b}(z), movParam.fmtSpec), ' s'), 'Units','normalized', 'color','w', 'HorizontalAlignment','center', 'FontSize',24 )
+                text( 0.9, 0.9, strcat(num2str(Tbout{run}{b}(z), movParam.fmtSpec), ' s'), 'Units','normalized', 'color','w', 'HorizontalAlignment','center', 'FontSize',movParam.FontSize )
                 if strcmpi(movParam.boutType, 'loco')
-                    text( 0.9, 0.1, strcat( num2str(boutSpeed{run}{b}(z), '%2.1f'), ' cm/s'), 'Units','normalized', 'color','w', 'HorizontalAlignment','center', 'FontSize',18 )
+                    text( 0.9, 0.1, strcat( num2str(boutSpeed{run}{b}(z), '%2.1f'), ' cm/s'), 'Units','normalized', 'color','w', 'HorizontalAlignment','center', 'FontSize',movParam.FontSize )
                 end
                 
                 exportgraphics(gca, tempFrameFile, 'Resolution',300); % save image with set resolution  
@@ -141,7 +143,7 @@ for run = setRun %runs
                 %pause(0.02); 
                 cla;
             end
-            close(aviFig);
+            close(movFig);
             % Write annotated Tif
             annotatedTif = zeros( [size(storeFrames(1).cdata),NperiScan], 'uint8');
             for z = flip(1:size(boutStack{run}{b},3))
@@ -150,17 +152,17 @@ for run = setRun %runs
             annotPath = strcat(boutFileName,'.tif');
             saveastiff(annotatedTif, annotPath, RGBopt )
 
-            % Write AVI
-            aviPath = sprintf('%s%s_run%i_%s_%s%03d.avi', movParam.dir, expt.name, run, movParam.boutType, movParam.regType, b);
-            fprintf('\nWriting %s...  ', aviPath); 
-            writerObj = VideoWriter(aviPath);
+            % Write mp4 (avi has issues with mac)
+            mp4path = sprintf('%s%s_run%i_%s_%s%03d.mp4', movParam.dir, expt.name, run, movParam.boutType, movParam.regType, b);
+            fprintf('\nWriting %s...  ', mp4path); 
+            writerObj = VideoWriter(mp4path, 'MPEG-4');
             writerObj.FrameRate = movParam.aviRate; % set the seconds per image
             open(writerObj);
             for z = 1:numel(storeFrames)
                 frame = storeFrames(z);    
                 writeVideo(writerObj, frame);
             end
-            close(writerObj); 
+            close(writerObj);
             toc
         end
     end
@@ -170,8 +172,8 @@ if strcmpi(movParam.level, 'cat') || strcmpi(movParam.level, 'both')
     boutStackCat = cell(1,NsetRun); boutSpeedCat = cell(1,NsetRun); boutTimeCat = cell(1,NsetRun);
     for r = 1:NsetRun
         boutStackCat{r} = cat(3, boutStack{setRun(r)}{:});
-        boutSpeedCat{r} = cat(1, boutSpeed{setRun(r)}{:});
-        boutTimeCat{r} = cat(1, Tbout{setRun(r)}{:});
+        boutSpeedCat{r} = cat(1, reshape(boutSpeed{setRun(r)}{:}, [], 1));
+        boutTimeCat{r} = cat(1, reshape(Tbout{setRun(r)}{:}, [], 1));
     end
     boutStackCat = cat(3, boutStackCat{:});
     boutSpeedCat = cat(1, boutSpeedCat{:});
@@ -179,41 +181,42 @@ if strcmpi(movParam.level, 'cat') || strcmpi(movParam.level, 'both')
     NcatFrame = size(boutStackCat,3);
     
     % Write the concatenated movie to tiff
+    %{
     catTifPath = sprintf('%s%s_%s_%s_concat.tif', movParam.dir, expt.name, movParam.regType, movParam.boutType);% %strcat(movParam.dir, 'CSD_', exptName, '_', movParam.sourceSbx,'.tif');
     GrayOpt = struct('overwrite',true, 'message',false, 'append',false, 'big',true, 'color',false );
     fprintf('\nWriting %s...', catTifPath); tic;
     saveastiff(boutStackCat, catTifPath, GrayOpt); toc
+    %}
     
-    % Make frames for AVI
+    % Make frames for MP4
     tic
     displayLims = prctile(boutStackCat(:), movParam.displayPct);
     close all; clearvars storeFrames
-    aviFig = figure('color','k', 'Units','normalized', 'OuterPosition', [0 0 1 1]); % 'WindowState','maximized',
+    movFig = figure('color','k', 'Units','normalized', 'OuterPosition', [0 0 1 1]); % 'WindowState','maximized',
     w = waitbar(0, 'Writing concatenated movie');
     for z = flip(1:NcatFrame) %  313
         imshow(boutStackCat(:,:,z), displayLims); hold on;
         if ~isempty(movParam.scalebar),  DrawScaleBar( movParam.scalebar );  end
         if ~isempty(ROI)
             if ~isempty(axon)
-                axonColor = distinguishable_colors(Naxon);
                 for a = 1:Naxon
-                    for i = flip(axon(a).ROI)
-                        plot( ROI(i).footprintEdge(:,2)-movParam.edges(1)+1, ROI(i).footprintEdge(:,1)-movParam.edges(3)+1, '.', 'color',axonColor(a,:), 'MarkerSize',1 );
-                        %text(ROI(i).cent(1)-movParam.edges(1)+1, ROI(i).cent(2)-movParam.edges(3)+1, sprintf('%i-%i',i,a), 'HorizontalAlignment','center', 'color',axonColor(a,:), 'FontSize',10  ) 
+                    for roi = flip(axon(a).ROI)
+                        plot( ROI(roi).footprintEdge(:,2)-movParam.edges(1)+1, ROI(roi).footprintEdge(:,1)-movParam.edges(3)+1, '.', 'color',axonColor(a,:), 'MarkerSize',1 );
+                        %text(ROI(i).cent(1)-movParam.edges(1)+1, ROI(i).cent(2)-movParam.edges(3)+1, sprintf('%i-%i',i,a), 'HorizontalAlignment','center', 'color',axonColor(a,:), 'FontSize',movParam.FontSize  ) 
                         %pause
                     end
                 end
             else
                 roiColor = distinguishable_colors(Nroi);
-                for i = 1:Nroi
-                    plot( ROI(i).footprintEdge(:,2)-movParam.edges(1)+1, ROI(i).footprintEdge(:,1)-movParam.edges(3)+1, '.', 'color',roiColor(i,:), 'MarkerSize',1 );
-                    %text(ROI(i).cent(1)-movParam.edges(1)+1, ROI(i).cent(2)-movParam.edges(3)+1, sprintf('%i',i), 'HorizontalAlignment','center', 'color',roiColor(i,:), 'FontSize',10  ) 
+                for roi = 1:Nroi
+                    plot( ROI(roi).footprintEdge(:,2)-movParam.edges(1)+1, ROI(roi).footprintEdge(:,1)-movParam.edges(3)+1, '.', 'color',roiColor(roi,:), 'MarkerSize',1 );
+                    %text(ROI(i).cent(1)-movParam.edges(1)+1, ROI(i).cent(2)-movParam.edges(3)+1, sprintf('%i',i), 'HorizontalAlignment','center', 'color',roiColor(i,:), 'FontSize',movParam.FontSize  ) 
                 end
             end
         end
-        text( 0.9, 0.9, strcat(num2str(boutTimeCat(z), movParam.fmtSpec), ' s'), 'Units','normalized', 'color','w', 'HorizontalAlignment','center', 'FontSize',24 )
+        text( 0.9, 0.9, strcat(num2str(boutTimeCat(z), movParam.fmtSpec), ' s'), 'Units','normalized', 'color','w', 'HorizontalAlignment','center', 'FontSize',movParam.FontSize )
         if strcmpi(movParam.boutType, 'loco')
-            text( 0.9, 0.1, strcat(num2str(boutSpeedCat(z), movParam.fmtSpec), ' cm/s'), 'Units','normalized', 'color','w', 'HorizontalAlignment','center', 'FontSize',18 )
+            text( 0.9, 0.1, strcat(num2str(boutSpeedCat(z), movParam.fmtSpec), ' cm/s'), 'Units','normalized', 'color','w', 'HorizontalAlignment','center', 'FontSize',movParam.FontSize )
         end
         exportgraphics(gca, tempFrameFile, 'Resolution',100); % save image with set resolution  
         storeFrames(z) = im2frame(imread(tempFrameFile));  % getframe(aviFig);  % convert image to frame
@@ -221,13 +224,14 @@ if strcmpi(movParam.level, 'cat') || strcmpi(movParam.level, 'both')
         %pause%(0.01); 
         cla;
     end
-    close(aviFig);
+    close(movFig);
     delete(tempFrameFile); delete(w)
     toc
-    % Write AVI
-    aviPath = sprintf('%s%s_%s_%s_concat.avi', movParam.dir, expt.name, movParam.regType, movParam.boutType);
-    fprintf('\nWriting %s...  ', aviPath); tic;
-    writerObj = VideoWriter(aviPath);
+
+    % Write movie
+    mp4Path = sprintf('%s%s_%s_%s_concat.avi', movParam.dir, expt.name, movParam.regType, movParam.boutType);
+    fprintf('\nWriting %s...  ', mp4Path); tic;
+    writerObj = VideoWriter(mp4Path, 'MPEG-4');
     writerObj.FrameRate = movParam.aviRate; % set the seconds per image
     open(writerObj);
     for z = 1:numel(storeFrames)

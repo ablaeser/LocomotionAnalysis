@@ -30,6 +30,8 @@ maxMissingFrac = IP.Results.maxMissing; %0.1;
 acuteLimit = IP.Results.acute;
 postLimit = IP.Results.post;
 show = IP.Results.show;
+ROItype = 'ROI'; 
+if isfield(fluor(1).F, 'axon'), ROItype = 'axon';  end
 trimScan = round(trim*expt.scanRate);
 stillChunkNscan = round(stillChunkDur*expt.scanRate);
 stillEpoch = repmat(struct('scan_full',[], 'Nscan_full',NaN, 'T_full',[], 'Tstart_full',NaN, 'Tmid_full',NaN, 'Tstop_full',NaN, 'dur_full',[], 'dur_trim',[], 'raster_full',[], 'Froi',[], 'Fnp',[], 'Fo',[], 'dFF',[], 'scale',[],...
@@ -106,10 +108,10 @@ for runs = 1:expt.Nruns
             if ~isempty(fluor)
                 stillBin(S).raster = false(stillBin(S).Nscan, expt.Nroi);
                 % get fluor/deformation data during each epoch
-                stillBin(S).Froi = median( fluor(runs).Froi.ROI(stillBin(S).scan,:), 1, 'omitnan' );
-                stillBin(S).Fnp = median( fluor(runs).Fnp.ROI(stillBin(S).scan,:), 1, 'omitnan' );
-                stillBin(S).Fo = median( fluor(runs).Fo.ROI(stillBin(S).scan,:), 1, 'omitnan' );
-                stillBin(S).dFF = fluor(runs).dFF.ROI(stillBin(S).scan,:);
+                stillBin(S).Froi = median( fluor(runs).Froi.(ROItype)(stillBin(S).scan,:), 1, 'omitnan' );
+                stillBin(S).Fnp = median( fluor(runs).Fnp.(ROItype)(stillBin(S).scan,:), 1, 'omitnan' );
+                stillBin(S).Fo = median( fluor(runs).Fo.(ROItype)(stillBin(S).scan,:), 1, 'omitnan' );
+                stillBin(S).dFF = fluor(runs).dFF.(ROItype)(stillBin(S).scan,:);
                 % account for missing (poorly registered or otherwise excluded) (NaN) data
                 stillBin(S).Nmissing = sum(isnan( stillBin(S).dFF), 1);
                 stillBin(S).missingFrac = stillBin(S).Nmissing/stillBin(S).Nscan;
